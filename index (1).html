@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>✦ Pal's sweetbooth ✦</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+:root {
+  --bg:#0f0d12; --bg2:#181520; --bg3:#211d2e;
+  --border:rgba(255,220,180,0.12); --border2:rgba(255,220,180,0.25);
+  --rose:#f4a8c0; --peach:#f7c59f; --lavender:#c9b8f0;
+  --cream:#fdf0e0; --muted:#7a6e85; --text:#e8ddf5; --gold:#e8c878;
+}
+body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; min-height:100vh; overflow-x:hidden; }
+#bg-canvas { position:fixed; inset:0; z-index:0; pointer-events:none; }
+#app { position:relative; z-index:1; max-width:520px; margin:0 auto; padding:1.5rem 1rem 5rem; display:flex; flex-direction:column; align-items:center; gap:1.2rem; }
+
+/* header */
+header { text-align:center; padding:0.5rem 0; }
+.logo { font-family:'DM Serif Display',serif; font-size:clamp(2.2rem,10vw,3rem); color:var(--cream); letter-spacing:-0.01em; line-height:1; }
+.logo span { color:var(--rose); font-style:italic; }
+.tagline { font-size:11px; letter-spacing:0.22em; color:var(--muted); text-transform:uppercase; margin-top:5px; }
+
+/* strip selector */
+.strip-selector { display:flex; gap:8px; }
+.shot-opt { padding:7px 20px; border-radius:30px; border:1px solid var(--border2); background:transparent; color:var(--muted); font-family:'DM Sans',sans-serif; font-size:12px; cursor:pointer; transition:all 0.2s; }
+.shot-opt.active { background:rgba(244,168,192,0.12); border-color:var(--rose); color:var(--rose); }
+
+/* viewfinder */
+#viewfinder { width:100%; aspect-ratio:1/1; border-radius:16px; overflow:hidden; border:1px solid var(--border2); background:var(--bg2); position:relative; box-shadow:0 0 60px rgba(244,168,192,0.06); }
+#video { width:100%; height:100%; object-fit:cover; display:block; border-radius:16px; transform:scaleX(-1); }
+#video.rear { transform:scaleX(1); }
+.corner { position:absolute; width:18px; height:18px; border-color:var(--rose); border-style:solid; opacity:0.5; z-index:10; }
+.corner.tl { top:10px; left:10px; border-width:2px 0 0 2px; border-radius:3px 0 0 0; }
+.corner.tr { top:10px; right:10px; border-width:2px 2px 0 0; border-radius:0 3px 0 0; }
+.corner.bl { bottom:10px; left:10px; border-width:0 0 2px 2px; border-radius:0 0 0 3px; }
+.corner.br { bottom:10px; right:10px; border-width:0 2px 2px 0; border-radius:0 0 3px 0; }
+#shot-counter { position:absolute; bottom:12px; left:50%; transform:translateX(-50%); display:flex; gap:5px; z-index:10; }
+.dot { width:7px; height:7px; border-radius:50%; border:1px solid var(--rose); opacity:0.4; transition:all 0.3s; }
+.dot.done { background:var(--rose); opacity:1; box-shadow:0 0 8px rgba(244,168,192,0.6); }
+.dot.next { border-color:var(--peach); animation:dot-pulse 0.8s ease-in-out infinite alternate; }
+@keyframes dot-pulse { from{opacity:0.4} to{opacity:1; box-shadow:0 0 10px rgba(247,197,159,0.5)} }
+#no-camera { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1rem; z-index:20; }
+#no-camera p { color:var(--muted); font-size:13px; }
+#countdown-overlay { position:absolute; inset:0; z-index:30; display:flex; align-items:center; justify-content:center; background:rgba(15,13,18,0.5); border-radius:16px; opacity:0; pointer-events:none; transition:opacity 0.2s; flex-direction:column; gap:8px; }
+#countdown-overlay.active { opacity:1; pointer-events:all; }
+#countdown-num { font-family:'DM Serif Display',serif; font-size:clamp(5rem,20vw,8rem); color:var(--cream); line-height:1; animation:num-pop 1s cubic-bezier(.17,.67,.45,1.4); }
+@keyframes num-pop { 0%{transform:scale(2.2);opacity:0} 40%{transform:scale(0.85);opacity:1} 100%{transform:scale(1)} }
+#countdown-label { font-size:11px; letter-spacing:0.25em; color:var(--rose); text-transform:uppercase; }
+#flash { position:fixed; inset:0; z-index:200; background:white; opacity:0; pointer-events:none; }
+
+/* filters */
+#filter-row { width:100%; display:flex; gap:7px; overflow-x:auto; padding-bottom:2px; scrollbar-width:none; }
+#filter-row::-webkit-scrollbar { display:none; }
+.f-btn { flex:0 0 auto; padding:6px 13px; border-radius:20px; border:1px solid var(--border); background:transparent; color:var(--muted); font-family:'DM Sans',sans-serif; font-size:11px; cursor:pointer; transition:all 0.2s; white-space:nowrap; }
+.f-btn:hover { border-color:var(--lavender); color:var(--lavender); }
+.f-btn.active { border-color:var(--lavender); color:var(--lavender); background:rgba(201,184,240,0.1); }
+
+/* controls */
+#controls { display:flex; align-items:center; gap:12px; justify-content:center; width:100%; }
+.ctrl-btn { padding:10px 18px; border-radius:30px; border:1px solid var(--border2); background:var(--bg2); color:var(--muted); font-family:'DM Sans',sans-serif; font-size:12px; cursor:pointer; transition:all 0.2s; }
+.ctrl-btn:hover { border-color:var(--rose); color:var(--rose); }
+#shutter { width:68px; height:68px; border-radius:50%; border:2px solid var(--rose); background:radial-gradient(circle at 38% 38%,rgba(244,168,192,0.2),rgba(244,168,192,0.04)); cursor:pointer; transition:all 0.2s; display:flex; align-items:center; justify-content:center; box-shadow:0 0 24px rgba(244,168,192,0.1); }
+#shutter:hover { box-shadow:0 0 32px rgba(244,168,192,0.3); border-color:var(--peach); transform:scale(1.06); }
+#shutter:active { transform:scale(0.93); }
+#shutter-inner { width:44px; height:44px; border-radius:50%; background:radial-gradient(circle at 35% 35%,rgba(244,168,192,0.5),rgba(244,168,192,0.15)); border:1px solid rgba(244,168,192,0.4); }
+#shutter.busy { opacity:0.5; pointer-events:none; }
+
+/* progress */
+#progress-bar { width:100%; height:2px; background:var(--bg3); border-radius:2px; overflow:hidden; opacity:0; transition:opacity 0.3s; }
+#progress-fill { height:100%; width:0%; background:linear-gradient(90deg,var(--rose),var(--peach)); transition:width 0.5s ease; border-radius:2px; }
+#progress-bar.show { opacity:1; }
+
+/* result */
+#result-section { width:100%; display:none; flex-direction:column; align-items:center; gap:1rem; }
+#result-section.show { display:flex; }
+.result-label { font-family:'DM Serif Display',serif; font-size:1.1rem; color:var(--cream); display:flex; align-items:center; gap:8px; }
+.result-label::before, .result-label::after { content:'✦'; color:var(--rose); font-size:10px; }
+#strip-canvas { border-radius:8px; box-shadow:0 8px 40px rgba(0,0,0,0.6),0 0 0 1px var(--border2); max-width:min(260px,80vw); display:block; }
+.result-actions { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+.r-btn { padding:10px 22px; border-radius:30px; font-family:'DM Sans',sans-serif; font-size:12px; cursor:pointer; border:1px solid; transition:all 0.2s; }
+.r-btn.save { border-color:var(--rose); color:var(--rose); background:rgba(244,168,192,0.08); }
+.r-btn.retake { border-color:var(--muted); color:var(--muted); background:transparent; }
+.r-btn:hover { transform:scale(1.03); }
+
+/* past strips */
+#past-section { width:100%; }
+.section-title { font-size:10px; letter-spacing:0.25em; color:var(--muted); text-transform:uppercase; margin-bottom:10px; }
+#past-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(90px,1fr)); gap:8px; }
+.past-thumb { border-radius:6px; overflow:hidden; border:1px solid var(--border); cursor:pointer; transition:all 0.25s; aspect-ratio:1/2.5; animation:thumb-in 0.35s ease-out; }
+@keyframes thumb-in { from{opacity:0;transform:scale(0.8)} to{opacity:1;transform:scale(1)} }
+.past-thumb:hover { border-color:var(--rose); transform:translateY(-3px); box-shadow:0 8px 20px rgba(244,168,192,0.1); }
+.past-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+
+/* layout selector */
+.layout-selector { display:flex; gap:6px; align-items:center; }
+.layout-label { font-size:10px; letter-spacing:0.2em; color:var(--muted); text-transform:uppercase; margin-right:2px; }
+.layout-opt {
+  width:36px; height:36px; border-radius:8px;
+  border:1px solid var(--border2); background:transparent;
+  color:var(--muted); cursor:pointer; transition:all 0.2s;
+  display:flex; align-items:center; justify-content:center;
+  padding:0;
+}
+.layout-opt:hover { border-color:var(--lavender); color:var(--lavender); }
+.layout-opt.active { border-color:var(--rose); color:var(--rose); background:rgba(244,168,192,0.1); }
+.layout-opt svg { width:18px; height:18px; }
+
+/* result layout switcher */
+.relayout-row { display:flex; gap:6px; align-items:center; justify-content:center; }
+.relayout-label { font-size:10px; letter-spacing:0.15em; color:var(--muted); text-transform:uppercase; }
+.rl-opt {
+  width:32px; height:32px; border-radius:7px;
+  border:1px solid var(--border); background:transparent;
+  color:var(--muted); cursor:pointer; transition:all 0.2s;
+  display:flex; align-items:center; justify-content:center; padding:0;
+}
+.rl-opt svg { width:15px; height:15px; }
+.rl-opt:hover { border-color:var(--rose); color:var(--rose); }
+.rl-opt.active { border-color:var(--rose); color:var(--rose); background:rgba(244,168,192,0.1); }
+
+/* strip canvas wide mode */
+#strip-canvas { border-radius:8px; box-shadow:0 8px 40px rgba(0,0,0,0.6),0 0 0 1px var(--border2); max-width:min(320px,92vw); display:block; }
+
+/* gesture ring */
+#gesture-ring { position:absolute; top:12px; right:12px; width:44px; height:44px; z-index:15; display:none; }
+#gesture-ring.show { display:block; }
+#gesture-ring svg { width:44px; height:44px; transform:rotate(-90deg); }
+#gesture-ring circle.track { fill:none; stroke:rgba(244,168,192,0.15); stroke-width:3; }
+#gesture-ring circle.fill  { fill:none; stroke:var(--rose); stroke-width:3; stroke-linecap:round;
+  stroke-dasharray:113; stroke-dashoffset:113; transition:stroke-dashoffset 0.05s linear; }
+#gesture-emoji { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:16px; }
+#gesture-hint { position:absolute; top:12px; left:50%; transform:translateX(-50%);
+  background:rgba(15,13,18,0.75); border:1px solid var(--border2);
+  color:var(--rose); font-size:10px; letter-spacing:0.15em;
+  padding:5px 12px; border-radius:20px; z-index:15; white-space:nowrap;
+  opacity:0; transition:opacity 0.4s; pointer-events:none; }
+#gesture-hint.show { opacity:1; }
+#gesture-mode-btn.active { border-color:var(--rose); color:var(--rose); background:rgba(244,168,192,0.08); }
+
+/* toast */
+#toast { position:fixed; bottom:2rem; left:50%; transform:translateX(-50%); background:var(--bg3); border:1px solid var(--border2); color:var(--rose); font-size:11px; letter-spacing:0.12em; padding:9px 20px; border-radius:30px; z-index:300; opacity:0; transition:opacity 0.3s; pointer-events:none; white-space:nowrap; }
+#toast.show { opacity:1; }
+.start-btn { padding:12px 32px; border-radius:30px; border:1px solid var(--rose); background:rgba(244,168,192,0.08); color:var(--rose); font-family:'DM Sans',sans-serif; font-size:13px; cursor:pointer; transition:all 0.2s; letter-spacing:0.05em; }
+.start-btn:hover { background:rgba(244,168,192,0.15); transform:scale(1.02); }
+</style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+<div id="flash"></div>
+<div id="toast"></div>
+<div id="app">
+  <header>
+    <div class="logo">Pal's <span>sweetbooth</span></div>
+    <div class="tagline">✦ capture the moment together ✦</div>
+  </header>
+
+  <div class="strip-selector">
+    <button class="shot-opt active" onclick="setShots(4,this)">4 photos</button>
+    <button class="shot-opt" onclick="setShots(6,this)">6 photos</button>
+    <button class="shot-opt" onclick="setShots(8,this)">8 photos</button>
+  </div>
+
+  <!-- layout picker -->
+  <div class="layout-selector">
+    <span class="layout-label">layout</span>
+    <button class="layout-opt active" id="lo-strip" onclick="setLayout('strip',this)" title="Strip">
+      <svg viewBox="0 0 18 18" fill="none"><rect x="3" y="1" width="12" height="4" rx="1" fill="currentColor" opacity="0.9"/><rect x="3" y="7" width="12" height="4" rx="1" fill="currentColor" opacity="0.7"/><rect x="3" y="13" width="12" height="4" rx="1" fill="currentColor" opacity="0.5"/></svg>
+    </button>
+    <button class="layout-opt" id="lo-grid" onclick="setLayout('grid',this)" title="Grid">
+      <svg viewBox="0 0 18 18" fill="none"><rect x="1" y="1" width="7" height="7" rx="1" fill="currentColor" opacity="0.9"/><rect x="10" y="1" width="7" height="7" rx="1" fill="currentColor" opacity="0.9"/><rect x="1" y="10" width="7" height="7" rx="1" fill="currentColor" opacity="0.6"/><rect x="10" y="10" width="7" height="7" rx="1" fill="currentColor" opacity="0.6"/></svg>
+    </button>
+    <button class="layout-opt" id="lo-row" onclick="setLayout('row',this)" title="Row">
+      <svg viewBox="0 0 18 18" fill="none"><rect x="1" y="6" width="4" height="6" rx="1" fill="currentColor" opacity="0.9"/><rect x="7" y="6" width="4" height="6" rx="1" fill="currentColor" opacity="0.7"/><rect x="13" y="6" width="4" height="6" rx="1" fill="currentColor" opacity="0.5"/></svg>
+    </button>
+  </div>
+
+  <div id="viewfinder">
+    <video id="video" autoplay playsinline muted></video>
+    <div class="corner tl"></div><div class="corner tr"></div>
+    <div class="corner bl"></div><div class="corner br"></div>
+    <div id="shot-counter"></div>
+    <div id="no-camera">
+      <p>Allow camera to start</p>
+      <button class="start-btn" onclick="initCamera()">✦ open camera</button>
+    </div>
+    <div id="countdown-overlay">
+      <div id="countdown-num">3</div>
+      <div id="countdown-label">get ready!</div>
+    </div>
+    <div id="gesture-hint">✌️ hold peace sign to start</div>
+    <div id="gesture-ring">
+      <svg viewBox="0 0 44 44"><circle class="track" cx="22" cy="22" r="18"/><circle class="fill" id="ring-fill" cx="22" cy="22" r="18"/></svg>
+      <div id="gesture-emoji">✌️</div>
+    </div>
+  </div>
+
+  <div id="progress-bar"><div id="progress-fill"></div></div>
+  <div id="filter-row"></div>
+
+  <div id="controls">
+    <button class="ctrl-btn" onclick="flipCamera()">⟳ flip</button>
+    <div id="shutter" onclick="startBooth()"><div id="shutter-inner"></div></div>
+    <button class="ctrl-btn" onclick="cycleDelay()">⏱ <span id="delay-label">3s</span></button>
+  </div>
+  <button class="ctrl-btn" id="gesture-mode-btn" onclick="toggleGestureMode()" style="width:100%;max-width:320px;">✌️ gesture mode: off</button>
+
+  <div id="result-section">
+    <div class="result-label">your strip</div>
+    <!-- switch layout after shooting -->
+    <div class="relayout-row">
+      <span class="relayout-label">view as</span>
+      <button class="rl-opt active" id="rl-strip" onclick="switchLayout('strip',this)" title="Strip">
+        <svg viewBox="0 0 15 15" fill="none"><rect x="2" y="1" width="11" height="3" rx="1" fill="currentColor" opacity="0.9"/><rect x="2" y="6" width="11" height="3" rx="1" fill="currentColor" opacity="0.7"/><rect x="2" y="11" width="11" height="3" rx="1" fill="currentColor" opacity="0.5"/></svg>
+      </button>
+      <button class="rl-opt" id="rl-grid" onclick="switchLayout('grid',this)" title="Grid">
+        <svg viewBox="0 0 15 15" fill="none"><rect x="1" y="1" width="6" height="6" rx="1" fill="currentColor" opacity="0.9"/><rect x="8" y="1" width="6" height="6" rx="1" fill="currentColor" opacity="0.9"/><rect x="1" y="8" width="6" height="6" rx="1" fill="currentColor" opacity="0.6"/><rect x="8" y="8" width="6" height="6" rx="1" fill="currentColor" opacity="0.6"/></svg>
+      </button>
+      <button class="rl-opt" id="rl-row" onclick="switchLayout('row',this)" title="Row">
+        <svg viewBox="0 0 15 15" fill="none"><rect x="1" y="5" width="3" height="5" rx="1" fill="currentColor" opacity="0.9"/><rect x="6" y="5" width="3" height="5" rx="1" fill="currentColor" opacity="0.7"/><rect x="11" y="5" width="3" height="5" rx="1" fill="currentColor" opacity="0.5"/></svg>
+      </button>
+    </div>
+    <canvas id="strip-canvas"></canvas>
+    <div class="result-actions">
+      <button class="r-btn save" onclick="downloadStrip()">↓ save strip</button>
+      <button class="r-btn retake" onclick="retake()">↺ retake</button>
+    </div>
+  </div>
+
+  <div id="past-section" style="display:none">
+    <div class="section-title">✦ past strips</div>
+    <div id="past-grid"></div>
+  </div>
+</div>
+
+<script>
+// sparkle bg
+const bgc=document.getElementById('bg-canvas'),bctx=bgc.getContext('2d');
+let sparks=[];
+function resizeBg(){bgc.width=window.innerWidth;bgc.height=window.innerHeight;}
+resizeBg();window.addEventListener('resize',resizeBg);
+for(let i=0;i<80;i++) sparks.push({x:Math.random(),y:Math.random(),r:Math.random()*1.5+0.3,a:Math.random(),speed:Math.random()*0.003+0.001,phase:Math.random()*Math.PI*2});
+function drawBg(t){
+  bctx.clearRect(0,0,bgc.width,bgc.height);
+  sparks.forEach(s=>{
+    s.a=0.15+0.6*(0.5+0.5*Math.sin(t*s.speed*1000+s.phase));
+    bctx.beginPath();bctx.arc(s.x*bgc.width,s.y*bgc.height,s.r,0,Math.PI*2);
+    bctx.fillStyle=`rgba(244,168,192,${s.a*0.7})`;bctx.fill();
+  });
+  requestAnimationFrame(drawBg);
+}
+requestAnimationFrame(drawBg);
+
+// filters
+const FILTERS=[
+  {label:'natural',css:'none'},
+  {label:'b&w',css:'grayscale(1) contrast(1.1)'},
+  {label:'warm',css:'sepia(0.5) saturate(1.3) brightness(1.05)'},
+  {label:'cool',css:'hue-rotate(190deg) saturate(0.9) brightness(0.95)'},
+  {label:'rosy',css:'hue-rotate(320deg) saturate(1.6) brightness(1.05)'},
+  {label:'faded',css:'contrast(0.85) saturate(0.7) brightness(1.1)'},
+  {label:'drama',css:'contrast(1.35) saturate(1.2) brightness(0.9)'},
+  {label:'dreamy',css:'brightness(1.1) saturate(0.8)'},
+];
+let activeFilter=0;
+const filterRow=document.getElementById('filter-row');
+FILTERS.forEach((f,i)=>{
+  const b=document.createElement('button');
+  b.className='f-btn'+(i===0?' active':'');
+  b.textContent=f.label;
+  b.onclick=()=>{activeFilter=i;document.querySelectorAll('.f-btn').forEach((x,j)=>x.classList.toggle('active',j===i));video.style.filter=f.css;};
+  filterRow.appendChild(b);
+});
+
+// camera
+const video=document.getElementById('video');
+let stream=null,facingMode='user';
+async function initCamera(retryCount=0){
+  try{
+    if(stream) stream.getTracks().forEach(t=>t.stop());
+    // stop any lingering tracks before requesting
+    stream=null;
+    await sleep(retryCount*400); // wait longer on each retry
+    stream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode, width:{ideal:1280}, height:{ideal:960}},
+      audio:false
+    });
+    video.srcObject=stream;
+    video.onloadedmetadata=()=>{
+      video.play();
+      document.getElementById('no-camera').style.display='none';
+    };
+  } catch(e) {
+    const msg = e.name;
+    if(msg==='NotReadableError' && retryCount < 3){
+      // camera busy (another app using it) — retry after short delay
+      toast('Camera busy, retrying...');
+      setTimeout(()=>initCamera(retryCount+1), 800);
+    } else if(msg==='NotAllowedError'){
+      showCameraError('Camera permission denied. Please allow camera access in your browser settings.');
+    } else if(msg==='NotReadableError'){
+      showCameraError('Camera is in use by another app. Close your camera app and tap retry.');
+    } else {
+      showCameraError('Could not access camera. Tap retry.');
+    }
+  }
+}
+function showCameraError(msg){
+  const nc = document.getElementById('no-camera');
+  nc.style.display='flex';
+  nc.innerHTML=`
+    <p style="color:var(--muted);font-size:13px;text-align:center;padding:0 1rem;line-height:1.6;">${msg}</p>
+    <button class="start-btn" onclick="initCamera()">↺ retry</button>
+  `;
+}
+function flipCamera(){
+  facingMode=facingMode==='user'?'environment':'user';
+  video.classList.toggle('rear',facingMode==='environment');
+  initCamera();
+}
+
+// shots config
+let totalShots=4;
+function setShots(n,el){
+  totalShots=n;
+  document.querySelectorAll('.shot-opt').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  buildDots(n);
+}
+
+// delay
+const DELAYS=[3,5,0];let delayIdx=0;
+function cycleDelay(){
+  delayIdx=(delayIdx+1)%DELAYS.length;
+  const v=DELAYS[delayIdx];
+  document.getElementById('delay-label').textContent=v===0?'off':v+'s';
+}
+
+// dots
+function buildDots(n){
+  const el=document.getElementById('shot-counter');el.innerHTML='';
+  for(let i=0;i<n;i++){const d=document.createElement('div');d.className='dot';d.id='dot-'+i;el.appendChild(d);}
+}
+buildDots(4);
+function setDot(i,state){
+  const d=document.getElementById('dot-'+i);if(!d)return;
+  d.classList.remove('done','next');
+  if(state==='done')d.classList.add('done');
+  if(state==='next')d.classList.add('next');
+}
+
+// booth sequence
+let capturedFrames=[],boothRunning=false;
+async function startBooth(){
+  if(!stream){toast('Open camera first');return;}
+  if(boothRunning)return;
+  boothRunning=true;capturedFrames=[];
+  document.getElementById('result-section').classList.remove('show');
+  const pb=document.getElementById('progress-bar'),pf=document.getElementById('progress-fill');
+  pb.classList.add('show');pf.style.width='0%';
+  document.getElementById('shutter').classList.add('busy');
+  buildDots(totalShots);
+  const delay=DELAYS[delayIdx];
+  for(let i=0;i<totalShots;i++){
+    setDot(i,'next');
+    if(delay>0) await runCountdown(delay,i===0?'get ready!':'smile again!');
+    else await sleep(400);
+    await shoot();
+    setDot(i,'done');
+    pf.style.width=((i+1)/totalShots*100)+'%';
+    if(i<totalShots-1) await sleep(900);
+  }
+  pb.classList.remove('show');
+  document.getElementById('shutter').classList.remove('busy');
+  boothRunning=false;
+  buildStrip();
+}
+
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+function runCountdown(sec,label){
+  return new Promise(resolve=>{
+    const overlay=document.getElementById('countdown-overlay');
+    const numEl=document.getElementById('countdown-num');
+    const lblEl=document.getElementById('countdown-label');
+    overlay.classList.add('active');
+    lblEl.textContent=label;
+    let n=sec;numEl.textContent=n;triggerAnim(numEl);
+    const iv=setInterval(()=>{
+      n--;
+      if(n<=0){clearInterval(iv);overlay.classList.remove('active');resolve();}
+      else{numEl.textContent=n;triggerAnim(numEl);}
+    },1000);
+  });
+}
+function triggerAnim(el){el.style.animation='none';void el.offsetWidth;el.style.animation='num-pop 1s cubic-bezier(.17,.67,.45,1.4)';}
+
+function shoot(){
+  return new Promise(resolve=>{
+    const fl=document.getElementById('flash');
+    fl.style.transition='none';fl.style.opacity='0.85';
+    setTimeout(()=>{fl.style.transition='opacity 0.45s ease-out';fl.style.opacity='0';},30);
+    const W=video.videoWidth||640,H=video.videoHeight||480;
+    const cv=document.createElement('canvas');cv.width=W;cv.height=H;
+    const ctx=cv.getContext('2d');
+    if(facingMode==='user'){ctx.translate(W,0);ctx.scale(-1,1);}
+    const f=FILTERS[activeFilter].css;
+    ctx.filter=(f==='none')?'':f;
+    ctx.drawImage(video,0,0,W,H);
+    capturedFrames.push(cv.toDataURL('image/jpeg',0.92));
+    setTimeout(resolve,50);
+  });
+}
+
+// ── LAYOUT ───────────────────────────────────────────────────
+let activeLayout = 'strip'; // 'strip' | 'grid' | 'row'
+
+function setLayout(l, el) {
+  activeLayout = l;
+  document.querySelectorAll('.layout-opt').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  // sync relayout buttons too
+  syncRelayoutBtns(l);
+}
+
+function switchLayout(l, el) {
+  activeLayout = l;
+  syncRelayoutBtns(l);
+  // also sync top layout buttons
+  document.getElementById('lo-strip').classList.toggle('active', l==='strip');
+  document.getElementById('lo-grid').classList.toggle('active',  l==='grid');
+  document.getElementById('lo-row').classList.toggle('active',   l==='row');
+  // redraw with same captured frames
+  if (capturedFrames.length > 0) buildStrip();
+}
+
+function syncRelayoutBtns(l) {
+  document.getElementById('rl-strip').classList.toggle('active', l==='strip');
+  document.getElementById('rl-grid').classList.toggle('active',  l==='grid');
+  document.getElementById('rl-row').classList.toggle('active',   l==='row');
+}
+
+// build strip — supports strip / grid / row layouts
+function buildStrip(){
+  const n = capturedFrames.length;
+  const sc = document.getElementById('strip-canvas');
+  const ctx = sc.getContext('2d');
+
+  const PAD = 8;
+  const PHOTO_W = 236;
+  const PHOTO_H = PHOTO_W; // 1:1 square ratio
+  const GAP = 6;
+  const HEADER = 44;
+  const FOOTER = 30;
+
+  let canvasW, canvasH;
+  let positions = []; // {x,y,w,h} for each photo
+
+  if (activeLayout === 'strip') {
+    canvasW = PHOTO_W + PAD*2;
+    canvasH = HEADER + n*(PHOTO_H+GAP) - GAP + FOOTER + 16;
+    for (let i=0;i<n;i++) positions.push({ x:PAD, y:HEADER+i*(PHOTO_H+GAP), w:PHOTO_W, h:PHOTO_H });
+
+  } else if (activeLayout === 'grid') {
+    const cols = 2;
+    const rows = Math.ceil(n/2);
+    const gPW = Math.floor((PHOTO_W*2 + GAP - GAP) / 2);
+    const gPH = gPW; // 1:1 square
+    canvasW = PAD + gPW*2 + GAP + PAD;
+    canvasH = HEADER + rows*(gPH+GAP) - GAP + FOOTER + 16;
+    for (let i=0;i<n;i++){
+      const col=i%2, row=Math.floor(i/2);
+      positions.push({ x:PAD+col*(gPW+GAP), y:HEADER+row*(gPH+GAP), w:gPW, h:gPH });
+    }
+
+  } else { // row
+    const rPW = 150;
+    const rPH = rPW; // 1:1 square
+    canvasW = PAD + n*(rPW+GAP) - GAP + PAD;
+    canvasH = HEADER + rPH + FOOTER + 16;
+    for (let i=0;i<n;i++) positions.push({ x:PAD+i*(rPW+GAP), y:HEADER, w:rPW, h:rPH });
+  }
+
+  sc.width  = canvasW;
+  sc.height = canvasH;
+
+  // bg
+  ctx.fillStyle = '#0f0d12';
+  ctx.fillRect(0,0,canvasW,canvasH);
+  // grain
+  for(let i=0;i<4000;i++){
+    ctx.fillStyle=`rgba(255,255,255,${Math.random()*0.013})`;
+    ctx.fillRect(Math.random()*canvasW, Math.random()*canvasH,1,1);
+  }
+
+  // header
+  ctx.fillStyle = '#f4a8c0';
+  ctx.font = 'italic 17px "DM Serif Display",serif';
+  ctx.textAlign = 'center';
+  ctx.fillText("Pal's sweetbooth", canvasW/2, 26);
+  ctx.fillStyle = 'rgba(244,168,192,0.35)';
+  ctx.font = '8px "DM Sans",sans-serif';
+  ctx.fillText('✦  ✦  ✦', canvasW/2, 38);
+
+  const imgs = capturedFrames.map(src => { const img=new Image(); img.src=src; return img; });
+  Promise.all(imgs.map(img => new Promise(r=>{ img.onload=r; if(img.complete)r(); }))).then(() => {
+    imgs.forEach((img,i) => {
+      const {x,y,w,h} = positions[i];
+      // subtle border bg
+      ctx.fillStyle = 'rgba(253,240,224,0.05)';
+      ctx.beginPath(); rrp(ctx,x-1,y-1,w+2,h+2,5); ctx.fill();
+      // clip & draw
+      ctx.save(); ctx.beginPath(); rrp(ctx,x,y,w,h,4); ctx.clip();
+      ctx.drawImage(img,x,y,w,h);
+      ctx.restore();
+      // border
+      ctx.strokeStyle='rgba(244,168,192,0.18)'; ctx.lineWidth=0.5;
+      ctx.beginPath(); rrp(ctx,x,y,w,h,4); ctx.stroke();
+    });
+
+    // footer
+    const fy = canvasH - FOOTER + 4;
+    ctx.fillStyle = 'rgba(244,168,192,0.3)';
+    ctx.font = '7px "DM Sans",sans-serif';
+    ctx.textAlign = 'center';
+    const d = new Date();
+    ctx.fillText(d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}), canvasW/2, fy+8);
+    ctx.fillText("✦ Pal's sweetbooth ✦", canvasW/2, fy+20);
+
+    document.getElementById('result-section').classList.add('show');
+    saveToHistory();
+    toast('✦ strip ready!');
+    document.getElementById('result-section').scrollIntoView({behavior:'smooth',block:'nearest'});
+  });
+}
+
+function rrp(ctx,x,y,w,h,r){
+  ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();
+}
+
+function downloadStrip(){
+  const a=document.createElement('a');
+  a.href=document.getElementById('strip-canvas').toDataURL('image/jpeg',0.95);
+  a.download=`sweetbooth-${Date.now()}.jpg`;a.click();toast('✦ saved!');
+}
+function retake(){
+  document.getElementById('result-section').classList.remove('show');
+  capturedFrames=[];_lastSavedFrames=null;buildDots(totalShots);
+  document.getElementById('progress-fill').style.width='0%';
+}
+
+let history=[];
+let _lastSavedFrames = null; // prevent double-save on relayout redraws
+function saveToHistory(){
+  const key = capturedFrames.join('').slice(0,40);
+  if (_lastSavedFrames === key) return; // same session, just a relayout
+  _lastSavedFrames = key;
+  history.unshift({
+    thumb:document.getElementById('strip-canvas').toDataURL('image/jpeg',0.5),
+    full:document.getElementById('strip-canvas').toDataURL('image/jpeg',0.95)
+  });
+  const ps=document.getElementById('past-section'),pg=document.getElementById('past-grid');
+  ps.style.display=history.length?'block':'none';
+  pg.innerHTML='';
+  history.slice(0,8).forEach((h,i)=>{
+    const div=document.createElement('div');div.className='past-thumb';
+    div.innerHTML=`<img src="${h.thumb}" alt="strip">`;
+    div.onclick=()=>{const a=document.createElement('a');a.href=h.full;a.download=`sweetbooth-${i+1}.jpg`;a.click();};
+    pg.appendChild(div);
+  });
+}
+
+let toastTimer;
+function toast(msg){
+  const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+document.addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();startBooth();}if(e.code==='KeyF')flipCamera();});
+initCamera();
+</script>
+<!-- MediaPipe Hands -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<script>
+// ── GESTURE MODE ──────────────────────────────────────────────
+let gestureMode = false;
+let gestureActive = false;      // currently seeing peace sign
+let gestureStartTime = null;
+const GESTURE_HOLD_MS = 1000;   // 1 second hold
+const CIRCUMFERENCE = 2 * Math.PI * 18; // matches r="18" in SVG
+let mpHands = null;
+let mpCamera = null;
+
+function toggleGestureMode() {
+  gestureMode = !gestureMode;
+  const btn = document.getElementById('gesture-mode-btn');
+  const hint = document.getElementById('gesture-hint');
+  btn.textContent = gestureMode ? '✌️ gesture mode: on' : '✌️ gesture mode: off';
+  btn.classList.toggle('active', gestureMode);
+
+  if (gestureMode) {
+    hint.classList.add('show');
+    setTimeout(() => hint.classList.remove('show'), 3000);
+    initGesture();
+  } else {
+    stopGesture();
+    hint.classList.remove('show');
+    document.getElementById('gesture-ring').classList.remove('show');
+  }
+}
+
+function initGesture() {
+  if (mpHands) { mpCamera && mpCamera.start(); return; }
+
+  mpHands = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+  mpHands.setOptions({ maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.7, minTrackingConfidence: 0.6 });
+  mpHands.onResults(onHandResults);
+
+  mpCamera = new Camera(video, {
+    onFrame: async () => { if (gestureMode && stream) await mpHands.send({ image: video }); },
+    width: 320, height: 240
+  });
+  mpCamera.start();
+  toast('✌️ gesture mode on — hold peace sign!');
+}
+
+function stopGesture() {
+  gestureActive = false;
+  gestureStartTime = null;
+  if (mpCamera) { mpCamera.stop(); }
+  resetRing();
+}
+
+function onHandResults(results) {
+  if (!gestureMode || boothRunning) { resetRing(); return; }
+  if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+    resetRing(); return;
+  }
+
+  const lm = results.multiHandLandmarks[0];
+  const isPeace = detectPeaceSign(lm);
+
+  if (isPeace) {
+    if (!gestureActive) { gestureActive = true; gestureStartTime = Date.now(); }
+    const elapsed = Date.now() - gestureStartTime;
+    const progress = Math.min(elapsed / GESTURE_HOLD_MS, 1);
+    updateRing(progress);
+    document.getElementById('gesture-ring').classList.add('show');
+
+    if (elapsed >= GESTURE_HOLD_MS) {
+      gestureActive = false; gestureStartTime = null;
+      resetRing();
+      document.getElementById('gesture-ring').classList.remove('show');
+      startBooth();
+    }
+  } else {
+    resetRing();
+    gestureActive = false; gestureStartTime = null;
+  }
+}
+
+function detectPeaceSign(lm) {
+  // landmark indices:
+  // thumb: 4, index: 8 (tip) 6 (pip), middle: 12 (tip) 10 (pip)
+  // ring: 16 (tip) 14 (pip), pinky: 20 (tip) 18 (pip)
+  // wrist: 0
+
+  const fingerExtended = (tip, pip) => lm[tip].y < lm[pip].y;
+  const fingerCurled   = (tip, pip) => lm[tip].y > lm[pip].y;
+
+  const indexUp  = fingerExtended(8, 6);
+  const middleUp = fingerExtended(12, 10);
+  const ringDown = fingerCurled(16, 14);
+  const pinkyDown= fingerCurled(20, 18);
+
+  // thumb: tip should not be far out to the side (tucked)
+  const thumbTucked = Math.abs(lm[4].x - lm[3].x) < 0.12;
+
+  return indexUp && middleUp && ringDown && pinkyDown && thumbTucked;
+}
+
+function updateRing(progress) {
+  const offset = CIRCUMFERENCE * (1 - progress);
+  document.getElementById('ring-fill').style.strokeDashoffset = offset;
+}
+
+function resetRing() {
+  document.getElementById('ring-fill').style.strokeDashoffset = CIRCUMFERENCE;
+  if (!gestureActive) document.getElementById('gesture-ring').classList.remove('show');
+}
+</script>
+</body>
+</html>
