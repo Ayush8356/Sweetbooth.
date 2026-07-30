@@ -1,2 +1,2 @@
 # Sweetbooth.
-personal project - sweetboth website
+personal project - sweetboth website.
